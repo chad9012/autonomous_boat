@@ -644,6 +644,169 @@ This is not just camera testing—it’s an **integral sensor system for the aut
 
 ---
 
+# **Step 4: Basic Pixhawk & Raspberry Pi Integration with MAVProxy + DroneKit**
+
+## **Objective**
+
+This step allows you to:
+
+* **Connect the Raspberry Pi directly to the Pixhawk**
+* Use **MAVProxy and DroneKit-Python** to **arm the boat, control RC outputs, and send basic commands from Python scripts**
+
+### Why Do This?
+
+This step is not for full autonomous control yet—it’s to:
+
+* Give a **basic understanding of MAVLink control using Python**
+* Help students **interact with the Pixhawk from the onboard computer**
+* Test simple movement commands before full ROS 2 integration
+
+---
+
+## **Hardware Setup (Power & Connection)**
+
+| Connection                 | Purpose                                                                                                    |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Raspberry Pi Power**     | Powered via **Buck Converter** taking **12V AUX output from Power Module**, converted to **5V USB output** |
+| **USB-C Cable**            | Connects **Buck Converter USB output** to **Raspberry Pi USB-C power port**                                |
+| **Pixhawk → Raspberry Pi** | Use **USB data cable** or **TELEM port via UART to USB converter** for MAVLink communication               |
+
+### **Why Use Buck Converter + USB-C?**
+
+* This method provides **double safety** for the Raspberry Pi by:
+
+  * Isolating Pi power from main ESC/thruster circuit
+  * Preventing overvoltage and ensuring stable 5V supply
+
+---
+
+## **Software Installation on Raspberry Pi**
+
+### **Step 4.1: Install MAVProxy**
+
+MAVProxy is a **command-line ground control station** and **MAVLink proxy tool**.
+
+```bash
+sudo apt update
+sudo apt install python3-pip
+pip3 install MAVProxy
+```
+
+To run MAVProxy:
+
+```bash
+sudo mavproxy.py --master=/dev/ttyACM0 --baudrate 115200 --aircraft myboat
+```
+
+* Replace `/dev/ttyACM0` with the correct port (use `ls /dev/tty*` to check)
+* If using UART, set correct serial device like `/dev/ttyUSB0`
+
+##### Reference:
+
+[MAVProxy Docs](https://ardupilot.github.io/MAVProxy/html/index.html)
+
+---
+
+### **Step 4.2: Install DroneKit-Python**
+
+DroneKit allows you to **write Python scripts** to control Pixhawk.
+
+```bash
+pip3 install dronekit dronekit-sitl pymavlink
+```
+
+##### Reference:
+
+[DroneKit-Python GitHub](https://github.com/dronekit/dronekit-python)
+
+---
+
+## **Basic Python Example: Arm and Control the Boat**
+
+Here is a **simple Python script** to:
+
+* Connect to Pixhawk
+* Arm the boat
+* Send throttle commands (using RC override)
+
+```python
+from dronekit import connect, VehicleMode
+import time
+
+# Connect to the Pixhawk (replace with your port)
+vehicle = connect('/dev/ttyACM0', baud=115200, wait_ready=True)
+
+# Arm the vehicle
+vehicle.mode = VehicleMode("MANUAL")
+vehicle.armed = True
+
+while not vehicle.armed:
+    print("Waiting for arming...")
+    time.sleep(1)
+
+print("Armed!")
+
+# Send RC override to control thrusters
+# RC channels: 1- Roll, 2- Pitch, 3- Throttle, 4- Yaw
+# Set channel 3 (Throttle) to mid (1500 = neutral), >1500 = forward
+
+vehicle.channels.overrides['3'] = 1600  # Move forward
+time.sleep(5)
+vehicle.channels.overrides['3'] = 1500  # Stop
+
+# Disarm
+vehicle.armed = False
+vehicle.close()
+```
+
+---
+
+## **Summary of Step 4**
+
+At the end of this step:
+
+* You can **power the Raspberry Pi from the boat’s 12V system safely**.
+* The **Raspberry Pi can communicate with the Pixhawk over USB**.
+* You can run **basic Python scripts using MAVProxy and DroneKit** to:
+
+  * Arm the boat
+  * Control RC outputs (like throttle)
+  * Disarm the boat after testing
+
+---
+
+## **Why This Step Matters**
+
+While this step is **not for final mission control**, it is important for:
+
+* Teaching **how to send commands to Pixhawk using Python**
+* Giving a **feel of MAVLink protocol and basic scripting**
+* **Testing hardware connections safely before full autonomy**
+
+This step makes sure future students can quickly prototype simple movements before dealing with complex ROS 2 autonomy stacks.
+
+---
+
+## **Next Steps**
+
+In the next phases, you will:
+
+* **Integrate ROS 2 and MAVROS for full autonomous control**
+* Use the camera and sonar in feedback loops
+* Plan and execute autonomous missions like mapping or waypoint navigation
+
+---
+
+## Useful Links (To Be Added)
+
+| Resource                   | Link         |
+| -------------------------- | ------------ |
+| MAVProxy Docs              | <paste link> |
+| DroneKit GitHub            | <paste link> |
+| ArduPilot RC Override Docs | <paste link> |
+
+---
+
 
 
 
