@@ -386,6 +386,263 @@ At the end of this step:
 
 ---
 
+# **Step 3: Setting Up ArduCam PTZ Camera (IMX219) on Raspberry Pi (Ubuntu 24.04)**
+
+## Objective
+
+This step enables you to:
+
+* **Use the ArduCam PTZ camera (IMX219 sensor)** for onboard vision tasks.
+* Control the **pan, tilt, zoom, focus, and IR cut** features via **Python and ROS 2 topics**.
+* Stream the camera feed in ROS 2 with **/image\_raw** topic publishing.
+
+This is a **critical part of the project** because it allows:
+
+* Onboard visual data capture
+* Remote control of the camera's mechanical components (PTZ system)
+* Integration with autonomous missions or mapping tasks
+
+---
+
+## Hardware
+
+| Component                | Purpose                                     |
+| ------------------------ | ------------------------------------------- |
+| **ArduCam PTZ Module**   | Pan-Tilt-Zoom-Focus camera system           |
+| **IMX219 Sensor**        | 8MP camera module (Raspberry Pi compatible) |
+| **MG995 Servos (2 pcs)** | Pan and Tilt mechanism                      |
+
+---
+
+## Why Custom Installation?
+
+* **Official ArduCam installation guide is outdated for Ubuntu 24.04.**
+* So, we follow general steps from ArduCam documentation, but adapt them manually for **Ubuntu 24.04 on Raspberry Pi 4**.
+
+---
+
+## **Installation Steps**
+
+### **Step 3.1: Install Required Dependencies**
+
+Run the following commands **on the Raspberry Pi**:
+
+```bash
+sudo apt-get update && sudo apt-get upgrade
+
+sudo apt install -y cmake meson libboost-dev libboost-program-options-dev \
+libgnutls28-dev openssl libtiff5-dev libjpeg-dev libpng-dev \
+libyaml-dev libepoxy-dev libcamera-dev libdrm-dev libexif-dev \
+qtbase5-dev libqt5core5a libqt5gui5 libqt5widgets5 \
+libglib2.0-dev libgstreamer-plugins-base1.0-dev \
+python3-pip git python3-smbus python3-opencv
+
+sudo pip3 install jinja2 pyyaml ply
+sudo pip3 install --upgrade meson
+```
+
+---
+
+### **Step 3.2: Compile libcamera**
+
+Since Raspberry Pi OS support is baked into libcamera but **Ubuntu requires manual compilation**, follow:
+
+```bash
+git clone --branch stable https://github.com/raspberrypi/libcamera.git
+cd libcamera
+meson setup build
+ninja -C build
+sudo ninja -C build install
+```
+
+##### Reference:
+
+[Libcamera GitHub](https://github.com/raspberrypi/libcamera)
+
+---
+
+### **Step 3.3: Compile libcamera-apps**
+
+```bash
+git clone https://github.com/raspberrypi/libcamera-apps.git
+cd libcamera-apps
+cmake .
+make -j4
+sudo make install
+```
+
+##### Reference:
+
+[Libcamera-apps GitHub](https://github.com/raspberrypi/libcamera-apps)
+
+---
+
+### **Step 3.4: Compile python-kms++**
+
+```bash
+git clone https://github.com/ArduCAM/python-kmsplusplus.git
+cd python-kmsplusplus
+mkdir build && cd build
+cmake ..
+make -j4
+sudo make install
+```
+
+---
+
+### **Step 3.5: Install Picamera2**
+
+Picamera2 is the Python library for camera control using libcamera.
+
+```bash
+sudo apt install -y python3-picamera2
+```
+
+If unavailable, install from source:
+
+```bash
+git clone https://github.com/raspberrypi/picamera2.git
+cd picamera2
+python3 setup.py install
+```
+
+##### Reference:
+
+[Picamera2 GitHub](https://github.com/raspberrypi/picamera2)
+
+---
+
+### **Step 3.6: Configure Camera in `/boot/firmware/config.txt`**
+
+Edit the config file:
+
+```bash
+sudo vi /boot/firmware/config.txt
+```
+
+Make these changes:
+
+* Disable auto camera detection:
+
+  ```
+  camera_auto_detect=0
+  ```
+
+* Add IMX219 overlay:
+
+  ```
+  dtoverlay=imx219
+  ```
+
+---
+
+### **Step 3.7: Enable `/dev/dma_heap` Access**
+
+To avoid permission issues with libcamera on Ubuntu, create a udev rule:
+
+```bash
+sudo nano /etc/udev/rules.d/raspberrypi.rules
+```
+
+Add:
+
+```
+SUBSYSTEM=="dma_heap", GROUP="video", MODE="0660"
+```
+
+Then add your user to the **video group**:
+
+```bash
+sudo usermod -a -G video $USER
+```
+
+**Reboot** the Raspberry Pi after this step.
+
+---
+
+## **Step 3.8: Run ArduCam PTZ Example**
+
+Clone the ArduCam PTZ controller repository:
+
+```bash
+git clone https://github.com/ArduCAM/PTZ-Camera-Controller.git
+cd PTZ-Camera-Controller
+sudo python3 FocuserExample.py
+```
+
+This Python script allows manual control of:
+
+* **Pan / Tilt** via MG995 servos
+* **Zoom / Focus / IR Cut** using the ArduCam lens system
+
+##### Reference:
+
+[ArduCAM PTZ Controller GitHub](https://github.com/ArduCAM/PTZ-Camera-Controller)
+
+---
+
+## **Step 3.9: Use ROS 2 `camera_launch` Node (Custom Node)**
+
+Once the ArduCam PTZ is set up, you can use **`camera_launch`**, a custom ROS 2 node developed for this project.
+
+### What `camera_launch` Does:
+
+* Publishes camera feed to:
+
+  ```
+  /image_raw  (sensor_msgs/Image)
+  ```
+
+* Provides ROS 2 topics to control the camera:
+
+  | Topic    | Purpose              |
+  | -------- | -------------------- |
+  | `/pan`   | Control pan angle    |
+  | `/tilt`  | Control tilt angle   |
+  | `/zoom`  | Control zoom         |
+  | `/focus` | Adjust focus         |
+  | `/ircut` | Toggle IR cut filter |
+
+This allows **integrating the PTZ camera into ROS 2 pipelines**, including:
+
+* Mapping
+* Object tracking
+* Visual inspection
+* Autonomous control loops
+
+---
+
+## **Summary of Step 3**
+
+At the end of this step, the boat has **full onboard camera capabilities**, including:
+
+* **Streaming images via ROS 2**
+* **Controlling the PTZ camera system remotely using ROS 2 topics or Python**
+
+---
+
+## **Why This Is Important**
+
+This camera setup is a **critical part of the autonomous boat project** because:
+
+* It allows for **visual feedback and live streaming** during missions.
+* It enables **mechanical control (pan, tilt, zoom)** for tracking and scanning.
+* It can be integrated into **future computer vision, mapping, and AI pipelines**.
+
+This is not just camera testing—it’s an **integral sensor system for the autonomous boat platform**.
+
+---
+
+## Useful Links (To Be Added)
+
+| Resource               | Link         |
+| ---------------------- | ------------ |
+| ArduCam PTZ Controller | <paste link> |
+| Libcamera Docs         | <paste link> |
+| Picamera2 Docs         | <paste link> |
+| Python-KMS++           | <paste link> |
+
+---
 
 
 
