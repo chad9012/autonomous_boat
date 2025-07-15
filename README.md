@@ -149,13 +149,6 @@ Once setup is complete, you can:
 
 ---
 
-Here’s the **next section of your README**:
-This documents **PC Setup and Raspberry Pi Setup**, including **dual boot, ROS 2 Jazzy installation, headless Raspberry Pi setup with Lubuntu GUI, NoMachine, and ROS 2 base install on Pi**.
-
-I’ve kept it clear and structured for **future students** and your **professor** to easily follow.
-
----
-
 # **Step 2: PC and Raspberry Pi Setup**
 
 ## Objective
