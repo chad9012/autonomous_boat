@@ -1019,8 +1019,275 @@ After this step, the system is no longer just a hardware test platform:
 
 ---
 
+Thanks for clarifying!
+Now I understand the correct architecture:
 
+### **Summary of How It Actually Works (Your System)**
 
+* **Joystick Input (`/joy` topic)**
+  ↓
+
+* **`rc_camera_controller` Node**
+
+  * Converts joystick inputs into **RC values** (PWM-style)
+  * Publishes to **`/mavros/rc/override`**
+
+* **Pixhawk RC System:**
+
+  * Pixhawk outputs **RC\_IN data** via **`/mavros/rc/in`** (this contains stick and switch values)
+
+* **`transmitter_controller` Node (Custom Node)**
+
+  * Subscribes to **`/mavros/rc/in`**
+  * Extracts **specific RC channels** meant for the camera (e.g., Pan/Tilt/Zoom)
+  * Converts them into ROS 2 topics:
+
+    * `/pan`
+    * `/tilt`
+    * `/zoom`
+    * `/focus`
+    * `/ircut`
+
+* **`camera_launch` Node**
+
+  * Subscribes to `/pan`, `/tilt`, `/zoom`, etc.
+  * Directly controls the **PTZ camera and servos**
+
+---
+
+# **Step 6: Boat and PTZ Camera Control Using Joystick (Corrected Architecture)**
+
+## **Objective**
+
+After this step, you will:
+
+* Use a **joystick to control both the boat’s movement and the PTZ camera**
+* Understand how **RC override and RC in signals are used together for control**
+
+---
+
+## **Hardware Required**
+
+| Hardware                            | Purpose        |
+| ----------------------------------- | -------------- |
+| Gamepad/Joystick                    | Manual control |
+| Pixhawk + Thrusters                 | Boat control   |
+| PTZ Camera (ArduCam + MG995 Servos) | Camera control |
+
+---
+
+## **6.1 Install Joystick ROS 2 Package**
+
+Install the ROS 2 `joy` package:
+
+```bash
+sudo apt update
+sudo apt install ros-jazzy-joy
+```
+
+---
+
+## **6.2 Run Joystick Node**
+
+Start the joystick input node:
+
+```bash
+ros2 run joy joy_node
+```
+
+This publishes:
+
+```
+/joy  (sensor_msgs/msg/Joy)
+```
+
+---
+
+## **6.3 Run `rc_camera_controller` Node**
+
+### **What It Does:**
+
+* Subscribes to **`/joy`**
+* Maps joystick axes/buttons to **RC channels**
+* Publishes **RC override** signals to:
+
+```
+/mavros/rc/override
+```
+
+---
+
+### **RC Channel Mapping (Example)**
+
+| Joystick Control | RC Channel                |
+| ---------------- | ------------------------- |
+| Left Stick Y     | Thruster Throttle (Ch 3)  |
+| Left Stick X     | Boat Steering (Ch 1)      |
+| Right Stick Y    | Camera Tilt (Ch 6)        |
+| Right Stick X    | Camera Pan (Ch 7)         |
+| Buttons          | Zoom / Focus (Ch 8, etc.) |
+
+---
+
+## **6.4 Pixhawk Feedback via `/rc/in`**
+
+Pixhawk publishes **RC\_IN** values to:
+
+```
+/mavros/rc/in
+```
+
+This is the **current input state**, including:
+
+* RC override inputs
+* RC transmitter inputs (if connected)
+* Joystick-simulated RC values from your `rc_camera_controller`
+
+---
+
+## **6.5 Run `transmitter_controller` Node**
+
+### **What It Does:**
+
+* Subscribes to **`/mavros/rc/in`**
+* Extracts RC channels mapped to camera control
+* Publishes to **ROS 2 topics** for PTZ control:
+
+| RC Channel    | ROS 2 Topic |
+| ------------- | ----------- |
+| Camera Pan    | `/pan`      |
+| Camera Tilt   | `/tilt`     |
+| Zoom          | `/zoom`     |
+| Focus         | `/focus`    |
+| IR Cut Filter | `/ircut`    |
+
+---
+
+## **6.6 Run `camera_launch` Node**
+
+### **What It Does:**
+
+* Subscribes to the **PTZ control topics**:
+
+```
+/pan  
+/tilt  
+/zoom  
+/focus  
+/ircut
+```
+
+* Sends the commands to the **PTZ hardware (ArduCam + MG995 Servos)**
+* Publishes **camera images to `/image_raw`**
+
+---
+
+## **6.7 System Architecture Diagram (Corrected)**
+
+```text
+[Joystick Input]
+       │
+       ▼
+   [/joy topic]
+       │
+       ▼
+[rc_camera_controller node]
+       │
+       └──> [/mavros/rc/override] ───> [Pixhawk Thruster/Steering Control]
+
+                  ▼
+          [Pixhawk RC System]
+                  │
+      Publishes: [/mavros/rc/in]
+                  │
+                  ▼
+      [transmitter_controller node]
+                  │
+    ┌─────────────┴─────────────┐
+    │                           │
+ [/pan], [/tilt], [/zoom], etc  [/focus], [/ircut]
+                  │
+                  ▼
+          [camera_launch node]
+                  │
+                  ▼
+       PTZ Camera + Servo Control
+```
+
+---
+
+## **6.8 Run the Full System**
+
+### **Launch Order:**
+
+1. **Start joystick node**
+
+```bash
+ros2 run joy joy_node
+```
+
+2. **Start MAVROS**
+
+```bash
+ros2 launch mavros mavros.launch.py fcu_url:=serial:///dev/ttyACM0:115200
+```
+
+3. **Run `rc_camera_controller`**
+
+```bash
+ros2 run your_package rc_camera_controller
+```
+
+4. **Run `transmitter_controller`**
+
+```bash
+ros2 run your_package transmitter_controller
+```
+
+5. **Run `camera_launch`**
+
+```bash
+ros2 launch your_camera_package camera_launch.launch.py
+```
+
+---
+
+## **Why This Architecture?**
+
+* **Thruster and steering control** uses **RC override via MAVROS**
+* **Camera control** uses **RC in values converted to ROS 2 topics**, then commands the PTZ camera directly
+* This separates **movement control** and **camera control** properly in the ROS ecosystem
+
+---
+
+## **Summary of Step 6**
+
+| Function                | Node                     |
+| ----------------------- | ------------------------ |
+| Joystick Input          | `joy`                    |
+| RC Channel Override     | `rc_camera_controller`   |
+| Extract Camera Commands | `transmitter_controller` |
+| PTZ Hardware Control    | `camera_launch`          |
+
+---
+
+## **Advantages of This Design**
+
+* Mimics real-world **RC transmitter workflows** using software
+* Easy to switch between **manual teleoperation** and **autonomous modes**
+* Clean separation between **boat motion control** and **camera control**
+
+---
+
+## **Useful Links (To Be Added)**
+
+| Resource                | Link         |
+| ----------------------- | ------------ |
+| ROS 2 Joy Docs          | <paste link> |
+| MAVROS RC Override Docs | <paste link> |
+| Your Custom Nodes Repo  | <paste link> |
+
+---
 
 
 ## Contribution & Future Work
