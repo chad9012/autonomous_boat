@@ -657,7 +657,7 @@ This step allows you to:
 
 This step is not for full autonomous control yet—it’s to:
 
-* Give a **basic understanding of MAVLink control using Python**
+* Give a **basic understanding of MAVLink contzrol using Python**
 * Help students **interact with the Pixhawk from the onboard computer**
 * Test simple movement commands before full ROS 2 integration
 
@@ -806,6 +806,219 @@ In the next phases, you will:
 | ArduPilot RC Override Docs | <paste link> |
 
 ---
+This is an **important step** because it moves from **basic Python control (Step 4)** to **ROS 2-based communication with Pixhawk**, which is the standard for:
+
+* Autonomous robotics
+* Multi-sensor integration
+* Mission-level control
+
+---
+
+# **Step 5: Install MAVROS on PC and Raspberry Pi (ROS 2 Integration with Pixhawk)**
+
+## **Objective**
+
+After completing this step, you will be able to:
+
+* **Arm and disarm the boat using ROS 2 commands**
+* Use the **Pixhawk autopilot directly with ROS 2 via MAVROS**
+* Integrate boat control into a **ROS 2 node system** for future autonomy pipelines
+
+---
+
+## **What is MAVROS?**
+
+**MAVROS** is a **ROS 2 package that bridges MAVLink (Pixhawk’s protocol) with ROS 2 topics and services**.
+
+It allows you to:
+
+* Arm/disarm the boat
+* Control RC channels (override)
+* Access GPS, IMU, battery, sonar, and more
+* Send waypoint and mission commands
+
+---
+
+## **5.1 Install MAVROS on the Laptop (Ground Station)**
+
+### **Step 5.1.1: Install dependencies**
+
+```bash
+sudo apt update
+sudo apt install ros-jazzy-mavros ros-jazzy-mavros-extras
+```
+
+---
+
+### **Step 5.1.2: Install GeographicLib datasets**
+
+```bash
+sudo apt install geographiclib-tools
+sudo geographiclib-get-geoids egm96-5
+```
+
+##### Reference:
+
+[MAVROS Install Guide](paste link)
+[GeographicLib Reference](paste link)
+
+---
+
+## **5.2 Install MAVROS on Raspberry Pi**
+
+On the **Raspberry Pi (Ubuntu 24.04 + ROS 2 Base)**:
+
+### **Step 5.2.1: Install MAVROS**
+
+```bash
+sudo apt update
+sudo apt install ros-jazzy-mavros ros-jazzy-mavros-extras
+```
+
+---
+
+### **Step 5.2.2: Install GeographicLib datasets**
+
+```bash
+sudo apt install geographiclib-tools
+sudo geographiclib-get-geoids egm96-5
+```
+
+---
+
+## **5.3 Connect Pixhawk to Raspberry Pi**
+
+Use either:
+
+* **USB Cable** (recommended for first tests)
+* Or **TELEM2 port via UART to USB converter**
+
+Pixhawk should appear as `/dev/ttyACM0` or `/dev/ttyUSB0`.
+Check with:
+
+```bash
+ls /dev/tty*
+```
+
+---
+
+## **5.4 Run MAVROS Node**
+
+### **On the Raspberry Pi or PC (example for Pi):**
+
+```bash
+ros2 launch mavros mavros.launch.py fcu_url:=serial:///dev/ttyACM0:115200
+```
+
+* Replace `/dev/ttyACM0` with your port if different.
+* `fcu_url` defines how MAVROS communicates with Pixhawk.
+
+---
+
+## **5.5 Arm and Disarm the Boat Using ROS 2**
+
+Once MAVROS is running, you can **arm or disarm the boat directly from ROS 2**.
+
+### **Using ROS 2 CLI:**
+
+To **arm the boat**:
+
+```bash
+ros2 service call /mavros/cmd/arming mavros_msgs/srv/CommandBool "{value: true}"
+```
+
+To **disarm the boat**:
+
+```bash
+ros2 service call /mavros/cmd/arming mavros_msgs/srv/CommandBool "{value: false}"
+```
+
+---
+
+### **Using Python ROS 2 Node Example:**
+
+Create a Python node to arm the boat:
+
+```python
+import rclpy
+from rclpy.node import Node
+from mavros_msgs.srv import CommandBool
+
+class BoatArmer(Node):
+    def __init__(self):
+        super().__init__('boat_armer')
+        self.client = self.create_client(CommandBool, '/mavros/cmd/arming')
+        while not self.client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for arming service...')
+        self.arm()
+
+    def arm(self):
+        req = CommandBool.Request()
+        req.value = True
+        future = self.client.call_async(req)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result().success:
+            self.get_logger().info('Boat Armed!')
+        else:
+            self.get_logger().info('Arming Failed')
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = BoatArmer()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+---
+
+## **Why This Step Is Important**
+
+After this step, the system is no longer just a hardware test platform:
+
+* The **Pixhawk and Raspberry Pi are fully integrated via ROS 2**
+* You can **control the boat in ROS 2 pipelines**, setting the foundation for:
+
+  * Autonomous missions
+  * Sensor fusion
+  * State estimation
+  * Path planning
+  * Advanced research
+
+---
+
+## **Project Status After Step 5**
+
+| Task                              | Status |
+| --------------------------------- | ------ |
+| Pixhawk Manual Setup              | ✅      |
+| Raspberry Pi Setup                | ✅      |
+| Camera System Setup               | ✅      |
+| Python MAVLink Control (DroneKit) | ✅      |
+| **ROS 2 MAVROS Integration**      | ✅      |
+
+---
+
+## **Next Steps (Optional Future Work)**
+
+1. **Integrate sensors (Sonar, GPS, Camera) into ROS 2 system**
+2. **Implement autonomous navigation (path planning, mapping)**
+3. **Build data logging and mission replay systems**
+4. **Add safety features (failsafe scripts, watchdog nodes)**
+
+---
+
+## Useful Links (To Be Added)
+
+| Resource                | Link         |
+| ----------------------- | ------------ |
+| MAVROS Docs             | <paste link> |
+| ROS 2 Service Call Docs | <paste link> |
+| DroneKit-Python         | <paste link> |
+
+---
+
 
 
 
